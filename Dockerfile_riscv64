@@ -1,0 +1,23 @@
+FROM riscv64/ubuntu:22.04 AS builder
+ARG runner_version=2.312.0
+ARG dotnet_version=8.0.101
+RUN apt update && apt install -y curl tar
+WORKDIR /opt/download
+RUN curl -LO https://github.com/dkurt/dotnet_riscv/releases/download/v${dotnet_version}/dotnet-sdk-${dotnet_version}-linux-riscv64.tar.gz
+RUN curl -LO https://github.com/dkurt/github_actions_riscv/releases/download/v${runner_version}/actions-runner-linux-riscv64-${runner_version}.tar.gz
+RUN mkdir dotnet && tar -C dotnet -xf dotnet-sdk-${dotnet_version}-linux-riscv64.tar.gz
+RUN mkdir action-runner && tar -C action-runner -xf actions-runner-linux-riscv64-${runner_version}.tar.gz
+
+FROM riscv64/ubuntu:22.04
+COPY --from=builder /opt/download/dotnet /usr/share/dotnet
+COPY --from=builder /opt/download/action-runner /opt/action-runner
+ENV token_file
+ENV repo_url
+ENV labels=''
+ENV name=''
+ENV work=''
+WORKDIR /opt/action-runner
+COPY main.py /opt/action-runner/main.py
+ENTRYPOINT [ './main.py', '--token-file', '${token_file}',
+             '--url', '${repo_rul}', '--labels', '${labels}',
+             '--name', '${name}', '--work', '${work}' ]
