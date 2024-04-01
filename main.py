@@ -6,7 +6,7 @@ import sys
 from typing import List, Sequence
 import urllib.parse
 
-_installDir = Path('opt/action-runner')
+_installDir = (Path(__file__) / '../').resolve()
 
 def _parseArgs(args: Sequence[str]) -> Namespace:
   parser = ArgumentParser()
@@ -29,13 +29,13 @@ def _configure(args: Namespace) -> None:
   with open(args.token_file) as tokenFile:
     cmd.append('--token')
     cmd.append(tokenFile.readline())
-  if args.labels:
+  if args.labels and args.labels != 'default':
     cmd.append('--labels')
     cmd.append(args.labels)
-  if args.name:
+  if args.name and args.name != 'default':
     cmd.append('--name')
     cmd.append(args.name)
-  if args.work:
+  if args.work and args.work != 'default':
     cmd.append('--work')
     cmd.append(args.work)
   subprocess.check_call(cmd)

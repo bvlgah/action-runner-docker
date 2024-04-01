@@ -1,23 +1,53 @@
-FROM riscv64/ubuntu:22.04 AS builder
+ARG base_image=riscv64/ubuntu:22.04
+ARG dotnet_dirname=dotnet
+ARG actions_runner_dirname=actions-runner
 ARG runner_version=2.312.0
 ARG dotnet_version=8.0.101
+ARG runner_username=runner
+
+FROM ${base_image} AS builder
+
+ARG runner_version
+ARG dotnet_version
+ARG dotnet_dirname
+ARG actions_runner_dirname
+
 RUN apt update && apt install -y curl tar
 WORKDIR /opt/download
 RUN curl -LO https://github.com/dkurt/dotnet_riscv/releases/download/v${dotnet_version}/dotnet-sdk-${dotnet_version}-linux-riscv64.tar.gz
 RUN curl -LO https://github.com/dkurt/github_actions_riscv/releases/download/v${runner_version}/actions-runner-linux-riscv64-${runner_version}.tar.gz
-RUN mkdir dotnet && tar -C dotnet -xf dotnet-sdk-${dotnet_version}-linux-riscv64.tar.gz
-RUN mkdir action-runner && tar -C action-runner -xf actions-runner-linux-riscv64-${runner_version}.tar.gz
+RUN mkdir -p ${dotnet_dirname} && \
+    tar -C ${dotnet_dirname} \
+        -xf dotnet-sdk-${dotnet_version}-linux-riscv64.tar.gz
+RUN mkdir ${actions_runner_dirname} && \
+    tar -C ${actions_runner_dirname} \
+        -xf actions-runner-linux-riscv64-${runner_version}.tar.gz
 
-FROM riscv64/ubuntu:22.04
-COPY --from=builder /opt/download/dotnet /usr/share/dotnet
-COPY --from=builder /opt/download/action-runner /opt/action-runner
-ENV token_file
-ENV repo_url
-ENV labels=''
-ENV name=''
-ENV work=''
-WORKDIR /opt/action-runner
-COPY main.py /opt/action-runner/main.py
-ENTRYPOINT [ './main.py', '--token-file', '${token_file}',
-             '--url', '${repo_rul}', '--labels', '${labels}',
-             '--name', '${name}', '--work', '${work}' ]
+FROM ${base_image}
+
+ARG dotnet_dirname
+ARG actions_runner_dirname
+ARG runner_username
+
+RUN apt update && apt install -y python3
+RUN useradd -m ${runner_username}
+COPY --from=builder /opt/download/${dotnet_dirname} /usr/share/${dotnet_dirname}
+COPY --from=builder --chown=${runner_username}:${runner_username} \
+     /opt/download/${actions_runner_dirname} \
+     /home/${runner_username}/${actions_runner_dirname}
+COPY --chown=${runner_username}:${runner_username} main.py \
+     /home/${runner_username}/${actions_runner_dirname}/main.py
+
+USER runner
+ENV runner_token_file=""
+ENV runner_repo_url=""
+ENV runner_labels="default"
+ENV runner_name="default"
+ENV runner_work="default"
+WORKDIR /home/${runner_username}/${actions_runner_dirname}
+CMD ./main.py \
+    --token-file ${runner_token_file} \
+    --url ${runner_repo_url} \
+    --labels ${runner_labels} \
+    --name ${runner_name} \
+    --work ${runner_work}
